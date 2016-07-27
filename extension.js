@@ -1,23 +1,41 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 var vscode = require('vscode');
+var Client = require('ssh2').Client;
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 function activate(context) {
+    console.log('Initializing lighthouse plugin...');
 
-    // Use the console to output diagnostic information (console.log) and errors (console.error)
-    // This line of code will only be executed once when your extension is activated
-    console.log('Congratulations, your extension "lighthouse" is now active!');
+    var disposable = vscode.commands.registerCommand('armada.inspect', function () {
+        clusters = vscode.workspace.getConfiguration('lighthouse.clusters')
 
-    // The command has been defined in the package.json file
-    // Now provide the implementation of the command with  registerCommand
-    // The commandId parameter must match the command field in package.json
-    var disposable = vscode.commands.registerCommand('extension.sayHello', function () {
-        // The code you place here will be executed every time your command is executed
+        
 
-        // Display a message box to the user
-        vscode.window.showInformationMessage('Hello World!');
+        for (i = 0; i < clusters.length; i++) {
+            try {
+                var conn = new Client();
+                conn.on('ready', function () {
+                    console.log('Client :: ready');
+                    conn.shell(function (err, stream) {
+                        if (err) throw err;
+                        stream.on('close', function () {
+                            console.log('Stream :: close');
+                            conn.end();
+                        }).on('data', function (data) {
+                            console.log('STDOUT: ' + data);
+                        }).stderr.on('data', function (data) {
+                            console.log('STDERR: ' + data);
+                        });
+                        stream.end('ls -l\nexit\n');
+                    });
+                }).connect({
+                    host: clusters[i].host,
+                    port: clusters[i].port,
+                    username: clusters[i].user,
+                    password: clusters[i].password
+                });
+            } catch (e) {
+                console.log(e);
+            }
+        }
     });
 
     context.subscriptions.push(disposable);

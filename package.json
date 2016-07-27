@@ -2,7 +2,7 @@
     "name": "lighthouse",
     "displayName": "Lighthouse",
     "description": "Plugin to manage Armada fleet from within VS Code",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "publisher": "Yakuza",
     "engines": {
         "vscode": "^1.0.0"
@@ -11,19 +11,51 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.sayHello"
+        "onCommand:armada.inspect"
     ],
     "main": "./extension",
     "contributes": {
         "commands": [{
-            "command": "extension.sayHello",
-            "title": "Hello World"
-        }]
+            "command": "armada.inspect",
+            "title": "Inspect Armada cluster"
+        }],
+        "configuration": {
+            "title": "Armada Lighthouse configuration",
+            "properties": {
+                "lighthouse.clusters" :{
+                    "type": ["array", "object"],
+                    "description": "List of connection strings to single node of Armada cluster (one per cluster). Format is as follows: \"user||server:port||private_key_path\"",
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                            "description": "User name on target server."
+                        },
+                        "password": {
+                            "type": "string",
+                            "description": "Optional - field if authentication should be password based."
+                        },
+                        "host": {
+                            "type": "string",
+                            "description": "Host's address."
+                        },
+                        "port": {
+                            "type": "integer",
+                            "description": "Port on which SSH daemon listens."
+                        },
+                        "pkey": {
+                            "type": "string",
+                            "description": "Path to private key that should be used for authentication."
+                        }
+                    }
+                }
+            }
+        }
     },
     "scripts": {
         "postinstall": "node ./node_modules/vscode/bin/install"
     },
     "devDependencies": {
-        "vscode": "^0.11.0"
+        "vscode": "^0.11.0",
+        "ssh2": "^0.5.0"
     }
 }
