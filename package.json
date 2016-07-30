@@ -26,6 +26,10 @@
                     "type": ["array", "object"],
                     "description": "List of connection strings to single node of Armada cluster (one per cluster). Format is as follows: \"user||server:port||private_key_path\"",
                     "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of Armada cluster to be used in reports"
+                        },
                         "username": {
                             "type": "string",
                             "description": "User name on target server."
