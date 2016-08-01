@@ -7,6 +7,7 @@ function runCommandViaSsh(ssh_config, command) {
         var exitCode = 0;
         var conn = new Client();
         conn.on('ready', function () {
+            console.log('Executing command: ' + command + ' @ ' + ssh_config.host);
             conn.exec(command, function (err, stream) {
                 if (err) reject(err);
                 stream.on('close', function (code, signal) {
@@ -16,10 +17,14 @@ function runCommandViaSsh(ssh_config, command) {
                     else {
                         resolve(output.join('\n'));
                     }
+                    console.log('Exit code: ' + exitCode);
                 }).on('data', function (data) {
                     output.push(data);
+                    console.log('STDOUT: ' + data);
                 }).on('exit', function (code) {
                     exitCode = code;
+                }).stderr.on('data', function(data){
+                    console.log('STDERR: ' + data);
                 });
             });
         }).connect(ssh_config);
@@ -184,8 +189,8 @@ function selectCluster() {
                 resolve(c);
                 return;
             });
+            reject('No valid option selected.');
         });
-        reject('No valid option selected.');
     });
 }
 
@@ -227,7 +232,7 @@ function runArmadaService(cluster, parameters, overrideEnv, overrideAppId) {
     if (memorySwapLimit)
         commandParameters.push('--memory-swap ' + memorySwapLimit);
 
-    var command = "armada run " + " ".join(commandParameters)
+    var command = "armada run " + commandParameters.join(" ");
     var sshConfig = getSshConfigForCluster(cluster);
     for (j = 0; j < instancesCount; j++) {
         runCommandViaSsh(sshConfig, command);

@@ -9,7 +9,7 @@
         "instances": 2
     },
     {
-        "serviceName": "mysql57",
+        "serviceName": "mysql",
         "env": "dev",
         "app_id": "example_mysql",
         "memoryLimit": "512M",
