@@ -23,7 +23,7 @@ function runCommandViaSsh(ssh_config, command) {
                     console.log('STDOUT: ' + data);
                 }).on('exit', function (code) {
                     exitCode = code;
-                }).stderr.on('data', function(data){
+                }).stderr.on('data', function (data) {
                     console.log('STDERR: ' + data);
                 });
             });
@@ -194,18 +194,6 @@ function selectCluster() {
     });
 }
 
-/*
-{
-    "serviceName": "example",
-    "env": "optionalDefaultEnv",
-    "app_id": "optionalDefaultAppId",
-    "dockyardAlias": "optionalAliasOfDockyard",
-    "memoryLimit": "100M",
-    "memorySwapLimit": "0M",
-    "instances": 1
-}
- */
-
 function runArmadaService(cluster, parameters, overrideEnv, overrideAppId) {
     var instancesCount = parameters.instances || 1;
 
@@ -218,7 +206,8 @@ function runArmadaService(cluster, parameters, overrideEnv, overrideAppId) {
     var appId = overrideAppId || parameters.appId;
     var dockyard = parameters.dockyardAlias;
     var memoryLimit = parameters.memoryLimit;
-    var memorySwapLimit = parameters.memorySwapLimit
+    var memorySwapLimit = parameters.memorySwapLimit;
+    var renameTo = parameters.renameTo;
 
     var commandParameters = [parameters.serviceName];
     if (env)
@@ -231,6 +220,8 @@ function runArmadaService(cluster, parameters, overrideEnv, overrideAppId) {
         commandParameters.push('--memory ' + memoryLimit);
     if (memorySwapLimit)
         commandParameters.push('--memory-swap ' + memorySwapLimit);
+    if (renameTo)
+        commandParameters.push('-r ' + renameTo);
 
     var command = "armada run " + commandParameters.join(" ");
     var sshConfig = getSshConfigForCluster(cluster);
@@ -265,6 +256,33 @@ function deployCurrentFile() {
     }
 }
 
+function insertDeploymentSnippet() {
+    vscode.window.activeTextEditor.edit(function (editor) {
+        editor.insert(new vscode.Position(0, 0), `
+[
+    {
+        "serviceName": "example",
+        "renameTo": "betterExample",
+        "env": "dev",
+        "app_id": null,
+        "dockyardAlias": null,
+        "memoryLimit": "100M",
+        "memorySwapLimit": "0M",
+        "instances": 2
+    },
+    {
+        "serviceName": "mysql",
+        "env": "dev",
+        "app_id": "example_mysql",
+        "memoryLimit": "512M",
+        "memorySwapLimit": "100M",
+        "instances": 1
+    }
+]
+        `);
+    });
+}
+
 function activate(context) {
     console.log('Initializing lighthouse plugin...');
 
@@ -287,6 +305,7 @@ function activate(context) {
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('armada.deploy', deployCurrentFile));
+    context.subscriptions.push(vscode.commands.registerCommand('armada.init_deployment_file', insertDeploymentSnippet));
 }
 exports.activate = activate;
 
