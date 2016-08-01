@@ -3,8 +3,8 @@ var Client = require('ssh2').Client;
 
 function runCommandViaSsh(ssh_config, command) {
     return new Promise(function (resolve, reject) {
-        output = []
-        exitCode = 0;
+        var output = []
+        var exitCode = 0;
         var conn = new Client();
         conn.on('ready', function () {
             conn.exec(command, function (err, stream) {
@@ -28,7 +28,7 @@ function runCommandViaSsh(ssh_config, command) {
 
 function runCommandInContainer(ssh_config, container, command) {
     return new Promise(function (resolve, reject) {
-        full_command = "armada ssh " + container.container_id + " " + command;
+        var full_command = "armada ssh " + container.container_id + " " + command;
         runCommandViaSsh(ssh_config, full_command)
             .then(function (output) {
                 resolve(output);
@@ -48,11 +48,11 @@ function getNodeRunningServices(ssh_config, node) {
 function getNodeDockyards(ssh_config, armada_service) {
     return new Promise(function (resolve, reject) {
         runCommandInContainer(ssh_config, armada_service, "armada dockyard list").then(function (output) {
-            dockyards = []
-            lines = output.trim().split('\n').slice(1);
-            lines.forEach(function(line){
-                dockyard = {}
-                columns = line.split(/[ ]+/).filter(function(item) {return item !== "";});
+            var dockyards = []
+            var lines = output.trim().split('\n').slice(1);
+            lines.forEach(function (line) {
+                var dockyard = {}
+                var columns = line.split(/[ ]+/).filter(function (item) { return item !== ""; });
                 dockyard.is_default = columns[0] === "->";
                 if (columns[0] === "->") columns = columns.slice(1);
 
@@ -71,19 +71,19 @@ function getNodeDockyards(ssh_config, armada_service) {
 function getNodeLoad(ssh_config, armada_service) {
     return new Promise(function (resolve, reject) {
         var loadavg = "", meminfo = "";
-        load = {}
+        var load = {}
         runCommandInContainer(ssh_config, armada_service, 'cat /ship_root_dir/proc/loadavg')
-            .then(function(output) {
-                loadavg = output.split(/\s+/).filter(function(item) {return item !== "";});
+            .then(function (output) {
+                loadavg = output.split(/\s+/).filter(function (item) { return item !== ""; });
                 load.averageLoad1 = parseFloat(loadavg[0]);
                 load.averageLoad5 = parseFloat(loadavg[1]);
                 load.averageLoad15 = parseFloat(loadavg[2]);
                 return runCommandInContainer(ssh_config, armada_service, 'cat /ship_root_dir/proc/meminfo');
-            }).then(function(output) {
+            }).then(function (output) {
                 meminfo = output.split('\n');
                 load.totalMemoryKB = parseInt(meminfo[0].split(/\s+/)[1]);
                 load.freeMemoryKB = parseInt(meminfo[1].split(/\s+/)[1]);
-                load.memoryUsedKB = load.totalMemoryKB - load.freeMemoryKB;                
+                load.memoryUsedKB = load.totalMemoryKB - load.freeMemoryKB;
                 load.availableMemoryKB = parseInt(meminfo[2].split(/\s+/)[1]);
                 load.buffers = parseInt(meminfo[3].split(/\s+/)[1]);
                 load.cachedMemoryKB = parseInt(meminfo[4].split(/\s+/)[1]);
@@ -91,48 +91,58 @@ function getNodeLoad(ssh_config, armada_service) {
                 load.swapFreeKB = parseInt(meminfo[15].split(/\s+/)[1]);
                 load.swapUsedKB = load.swapTotalKB - load.swapFreeKB;
                 return runCommandInContainer(ssh_config, armada_service, 'grep \"^processor\" /ship_root_dir/proc/cpuinfo | wc -l');
-            }).then(function(output) {
-                load.cpuCount = parseInt(output);                
+            }).then(function (output) {
+                load.cpuCount = parseInt(output);
                 resolve(load);
             });
     });
 }
 
-function inspectSingleCluster(cluster) {
+function getSshConfigForCluster(cluster) {
+    sshConfig = {
+        host: cluster.host,
+        port: cluster.port,
+        username: cluster.user,
+        password: cluster.password,
+        passphrase: cluster.passphrase
+    };
+    if (cluster.private_key) {
+        sshConfig.privateKey = require("fs").readFileSync(cluster.private_key);
+    }
+    return sshConfig;
+}
+
+function inspectSingleCluster(c) {
+    var cluster = c;
     return new Promise(function (resolve, reject) {
-        ssh_config = {
-            host: cluster.host,
-            port: cluster.port,
-            username: cluster.user,
-            password: cluster.password
-        };
-        runCommandViaSsh(ssh_config, 'curl http://localhost:8500/v1/catalog/nodes')
+        var sshConfig = getSshConfigForCluster(cluster);
+        runCommandViaSsh(sshConfig, 'curl http://localhost:8500/v1/catalog/nodes')
             .then(function (response) {
                 var nodes = JSON.parse(response);
-                nodes_statistics = {}
+                var results = {}
                 nodes.forEach(function (node) {
-                    nodes_statistics[node.Address] = { 'node': node };
+                    results[node.Address] = { 'node': node };
                 });
 
-                markers = [];
+                var markers = [];
 
                 nodes.forEach(function (node) {
-                    getNodeRunningServices(ssh_config, node).then(function (services) {
-                        nodes_statistics[node.Address]['services'] = services;
+                    getNodeRunningServices(sshConfig, node).then(function (services) {
+                        results[node.Address]['services'] = services;
                         services.forEach(function (service) {
                             if (service.name == "armada") {
-                                nodes_statistics[node.Address]['armada_service'] = service;
+                                results[node.Address]['armada_service'] = service;
                             }
                         });
-                        return getNodeDockyards(ssh_config, nodes_statistics[node.Address]['armada_service']);
+                        return getNodeDockyards(sshConfig, results[node.Address]['armada_service']);
                     }).then(function (dockyards) {
-                        nodes_statistics[node.Address]['dockyards'] = dockyards;
-                        return getNodeLoad(ssh_config, nodes_statistics[node.Address]['armada_service']);
+                        results[node.Address]['dockyards'] = dockyards;
+                        return getNodeLoad(sshConfig, results[node.Address]['armada_service']);
                     }).then(function (load) {
-                        nodes_statistics[node.Address]['load'] = load;
+                        results[node.Address]['load'] = load;
                         markers.push(node);
-                        if (markers.length == Object.keys(nodes_statistics).length) {
-                            resolve(nodes_statistics);
+                        if (markers.length == Object.keys(results).length) {
+                            resolve(results);
                         }
                     });
                 });
@@ -142,18 +152,20 @@ function inspectSingleCluster(cluster) {
 
 function inspectClusters() {
     try {
-        clusters = vscode.workspace.getConfiguration('lighthouse.clusters')
-
+        var clusters_connections = vscode.workspace.getConfiguration('lighthouse.clusters');
+        var cluster_inspections = [];
         vscode.commands.executeCommand("workbench.action.files.newUntitledFile").then(function () {
-            for (i = 0; i < clusters.length; i++) {
-                var cluster = clusters[i];
+            for (i = 0; i < clusters_connections.length; i++) {
+                var cluster = clusters_connections[i];
                 inspectSingleCluster(cluster).then(function (result) {
-                    vscode.window.activeTextEditor.edit(function (editor) {
-                        editor.insert(new vscode.Position(0, 0), 'Cluster: ' + cluster.name + '\n');
-                        editor.insert(new vscode.Position(0, 0), JSON.stringify(result, null, '\t') + '\n');
-                        editor.insert(new vscode.Position(0, 0), '\n==============================================\n\n');
-                    });
-                }).catch(function(reason) {throw reason;});
+                    cluster_inspections.push(result);
+
+                    if (cluster_inspections.length == clusters_connections.length) {
+                        vscode.window.activeTextEditor.edit(function (editor) {
+                            editor.insert(new vscode.Position(0, 0), JSON.stringify(cluster_inspections, null, '\t'));
+                        });
+                    }
+                }).catch(function (reason) { throw reason; });
             }
         });
     } catch (e) {
@@ -162,12 +174,114 @@ function inspectClusters() {
     }
 }
 
+function selectCluster() {
+    return new Promise(function (resolve, reject) {
+        var clusters_connections = vscode.workspace.getConfiguration('lighthouse.clusters');
+        var options = clusters_connections.map(function (c) { return c.name; });
+        vscode.window.showQuickPick(options).then(function (cluster_name) {
+            clusters_connections.forEach(function (c) {
+                if (c.name != cluster_name) return;
+                resolve(c);
+                return;
+            });
+        });
+        reject('No valid option selected.');
+    });
+}
+
+/*
+{
+    "serviceName": "example",
+    "env": "optionalDefaultEnv",
+    "app_id": "optionalDefaultAppId",
+    "dockyardAlias": "optionalAliasOfDockyard",
+    "memoryLimit": "100M",
+    "memorySwapLimit": "0M",
+    "instances": 1
+}
+ */
+
+function runArmadaService(cluster, parameters, overrideEnv, overrideAppId) {
+    var instancesCount = parameters.instances || 1;
+
+    if (!parameters.serviceName) {
+        vscode.window.showErrorMessage('"serviceName" is obligatory for every service');
+        return;
+    }
+
+    var env = overrideEnv || parameters.env;
+    var appId = overrideAppId || parameters.appId;
+    var dockyard = parameters.dockyardAlias;
+    var memoryLimit = parameters.memoryLimit;
+    var memorySwapLimit = parameters.memorySwapLimit
+
+    var commandParameters = [parameters.serviceName];
+    if (env)
+        commandParameters.push('--env ' + env);
+    if (appId)
+        commandParameters.push('--app_id ' + appId);
+    if (dockyard)
+        commandParameters.push('-d ' + dockyard);
+    if (memoryLimit)
+        commandParameters.push('--memory ' + memoryLimit);
+    if (memorySwapLimit)
+        commandParameters.push('--memory-swap ' + memorySwapLimit);
+
+    var command = "armada run " + " ".join(commandParameters)
+    var sshConfig = getSshConfigForCluster(cluster);
+    for (j = 0; j < instancesCount; j++) {
+        runCommandViaSsh(sshConfig, command);
+    }
+}
+
+function deployCurrentFile() {
+    var text = vscode.window.activeTextEditor.document.getText();
+    try {
+        var deploymentConfig = JSON.parse(text);
+        if (Array.isArray(deploymentConfig) === false) {
+            vscode.window.showErrorMessage('Configuration has to be JSON array.');
+            return;
+        }
+    } catch (e) {
+        vscode.window.showErrorMessage('Current document doesn\'t contain valid JSON.');
+        return;
+    }
+    try {
+        selectCluster().then(function (cluster) {
+            for (i = 0; i < deploymentConfig.length; i++) {
+                var config = deploymentConfig[i];
+                runArmadaService(cluster, config);
+            }
+        }).catch(function (reason) { throw reason; });
+    } catch (e) {
+        console.log(e);
+        vscode.window.showErrorMessage('Failed to complete deployment. Details logged.');
+        return;
+    }
+}
+
 function activate(context) {
     console.log('Initializing lighthouse plugin...');
 
-    var disposable = vscode.commands.registerCommand('armada.inspect', inspectClusters);
+    context.subscriptions.push(vscode.commands.registerCommand('armada.inspect_all', inspectClusters));
 
-    context.subscriptions.push(disposable);
+    context.subscriptions.push(vscode.commands.registerCommand('armada.inspect', function () {
+        selectCluster().then(function (cluster) {
+            vscode.commands.executeCommand("workbench.action.files.newUntitledFile").then(function () {
+                inspectSingleCluster(cluster).then(function (result) {
+                    vscode.window.activeTextEditor.edit(function (editor) {
+                        editor.insert(new vscode.Position(0, 0), 'Cluster: ' + cluster.name + '\n\n');
+                        editor.insert(new vscode.Position(0, 0), JSON.stringify(result, null, '\t'));
+                    });
+                })
+            });
+        }).catch(function (reason) {
+            console.error(e);
+            vscode.window.showErrorMessage('Failed to complete inspection. Details logged to console.');
+        });
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('armada.deploy', deployCurrentFile));
 }
 exports.activate = activate;
 

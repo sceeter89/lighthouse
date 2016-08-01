@@ -11,44 +11,66 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:armada.inspect"
+        "onCommand:armada.inspect",
+        "onCommand:armada.inspect_all",
+        "onCommand:armada.deploy",
+        "onCommand:armada.init_deployment_file"
     ],
     "main": "./extension",
     "contributes": {
-        "commands": [{
-            "command": "armada.inspect",
-            "title": "Inspect Armada cluster"
-        }],
+        "commands": [
+            {
+                "command": "armada.inspect_all",
+                "title": "Armada - inspect all clusters"
+            },
+            {
+                "command": "armada.inspect",
+                "title": "Armada - inspect cluster"
+            },
+            {
+                "command": "armada.deploy",
+                "title": "Armada - deploy current file"
+            },
+            {
+                "command": "armada.init_deployment_file",
+                "title": "Armada - insert deployment snippet in current file"
+            }
+        ],
         "configuration": {
             "title": "Armada Lighthouse configuration",
             "properties": {
-                "lighthouse.clusters" :{
-                    "type": ["array", "object"],
-                    "description": "List of connection strings to single node of Armada cluster (one per cluster). Format is as follows: \"user||server:port||private_key_path\"",
-                    "properties": {
-                        "name": {
-                            "type": "string",
-                            "description": "Name of Armada cluster to be used in reports"
-                        },
-                        "username": {
-                            "type": "string",
-                            "description": "User name on target server."
-                        },
-                        "password": {
-                            "type": "string",
-                            "description": "Optional - field if authentication should be password based."
-                        },
-                        "host": {
-                            "type": "string",
-                            "description": "Host's address."
-                        },
-                        "port": {
-                            "type": "integer",
-                            "description": "Port on which SSH daemon listens."
-                        },
-                        "pkey": {
-                            "type": "string",
-                            "description": "Path to private key that should be used for authentication."
+                "lighthouse.clusters": {
+                    "title": "List of clusters to be handled",
+                    "type": "array",
+                    "description": "List of connection strings to single node of Armada cluster (one per cluster).",
+                    "items": {
+                        "type": "object",
+                        "title": "Cluster connection",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Name of Armada cluster to be used in reports"
+                            },
+                            "username": {
+                                "type": "string",
+                                "description": "User name on target server."
+                            },
+                            "password": {
+                                "type": "string",
+                                "description": "Optional - field if authentication should be password based."
+                            },
+                            "host": {
+                                "type": "string",
+                                "description": "Host's address."
+                            },
+                            "port": {
+                                "type": "integer",
+                                "description": "Port on which SSH daemon listens."
+                            },
+                            "private_key": {
+                                "type": "string",
+                                "description": "Path to private key that should be used for authentication."
+                            }
                         }
                     }
                 }

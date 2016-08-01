@@ -1,0 +1,19 @@
+[
+    {
+        "serviceName": "example",
+        "env": "dev",
+        "app_id": null,
+        "dockyardAlias": null,
+        "memoryLimit": "100M",
+        "memorySwapLimit": "0M",
+        "instances": 2
+    },
+    {
+        "serviceName": "mysql57",
+        "env": "dev",
+        "app_id": "example_mysql",
+        "memoryLimit": "512M",
+        "memorySwapLimit": "100M",
+        "instances": 1
+    }
+]
